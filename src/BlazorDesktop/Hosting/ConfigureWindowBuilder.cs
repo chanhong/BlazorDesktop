@@ -1,5 +1,5 @@
-﻿// Licensed to the Blazor Desktop Contributors under one or more agreements.
-// The Blazor Desktop Contributors licenses this file to you under the MIT license.
+﻿// Licensed to the .NET Extension Contributors under one or more agreements.
+// The .NET Extension Contributors licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 namespace BlazorDesktop.Hosting;
@@ -9,15 +9,8 @@ namespace BlazorDesktop.Hosting;
 /// </summary>
 public class ConfigureWindowBuilder
 {
-    /// <summary>
-    /// The configuration.
-    /// </summary>
     private readonly IConfiguration _configuration;
 
-    /// <summary>
-    /// Creates a instance of <see cref="ConfigureWindowBuilder"/>.
-    /// </summary>
-    /// <param name="configuration">The configuration.</param>
     internal ConfigureWindowBuilder(IConfiguration configuration)
     {
         _configuration = configuration;

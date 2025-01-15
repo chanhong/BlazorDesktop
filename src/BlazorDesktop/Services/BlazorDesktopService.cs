@@ -1,50 +1,39 @@
-﻿// Licensed to the Blazor Desktop Contributors under one or more agreements.
-// The Blazor Desktop Contributors licenses this file to you under the MIT license.
+﻿// Licensed to the .NET Extension Contributors under one or more agreements.
+// The .NET Extension Contributors licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System.Diagnostics.CodeAnalysis;
-using System.Windows;
 using BlazorDesktop.Wpf;
-using WebView2.Runtime.AutoInstaller;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
+using System.Windows;
+using System.Windows.Threading;
 
 namespace BlazorDesktop.Services;
 
 /// <summary>
 /// The blazor desktop service.
 /// </summary>
-public class BlazorDesktopService : IHostedService, IDisposable
+public partial class BlazorDesktopService : IHostedService, IDisposable
 {
-    /// <summary>
-    /// The cancellation token registration.
-    /// </summary>
     private CancellationTokenRegistration _applicationStoppingRegistration;
-
-    /// <summary>
-    /// The application lifetime.
-    /// </summary>
     private readonly IHostApplicationLifetime _lifetime;
-
-    /// <summary>
-    /// The web view installer.
-    /// </summary>
-    private readonly WebViewInstaller _webViewInstaller;
-
-    /// <summary>
-    /// The services.
-    /// </summary>
     private readonly IServiceProvider _services;
+    private readonly ILogger<BlazorDesktopService> _logger;
+    private readonly WebViewInstaller _webViewInstaller;
 
     /// <summary>
     /// Creates a <see cref="BlazorDesktopService"/> instance.
     /// </summary>
     /// <param name="lifetime">The <see cref="IHostApplicationLifetime"/>.</param>
     /// <param name="services">The <see cref="IServiceProvider"/>.</param>
+    /// <param name="logger">The <see cref="ILogger{TCategoryName}"/>.</param>
     /// <param name="webViewInstaller">The <see cref="WebViewInstaller"/>.</param>
-    public BlazorDesktopService(IHostApplicationLifetime lifetime, IServiceProvider services, WebViewInstaller webViewInstaller)
+    public BlazorDesktopService(IHostApplicationLifetime lifetime, IServiceProvider services, ILogger<BlazorDesktopService> logger, WebViewInstaller webViewInstaller)
     {
         _applicationStoppingRegistration = new();
         _lifetime = lifetime;
         _services = services;
+        _logger = logger;
         _webViewInstaller = webViewInstaller;
     }
 
@@ -55,15 +44,9 @@ public class BlazorDesktopService : IHostedService, IDisposable
     /// <returns>A task that represents starting the service.</returns>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        _applicationStoppingRegistration = _lifetime.ApplicationStopping.Register(() =>
-        {
-            OnApplicationStopping();
-        });
+        _applicationStoppingRegistration = _lifetime.ApplicationStopping.Register(OnApplicationStopping);
 
-        if (_webViewInstaller.Enabled)
-        {
-            await WebView2AutoInstaller.CheckAndInstallAsync(silentInstall: _webViewInstaller.SilentInstall, cancellationToken: cancellationToken);
-        }
+        await _webViewInstaller.EnsureInstalledAsync(cancellationToken);
 
         var thread = new Thread(ApplicationThread);
         thread.SetApartmentState(ApartmentState.STA);
@@ -80,27 +63,27 @@ public class BlazorDesktopService : IHostedService, IDisposable
         return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// The application thread.
-    /// </summary>
+    [LoggerMessage(0, LogLevel.Critical, "Unhandled exception rendering component: {Message}", EventName = "ExceptionRenderingComponent")]
+    private static partial void LogUnhandledExceptionRenderingComponent(ILogger logger, string message, Exception exception);
+
     private void ApplicationThread()
     {
         var app = _services.GetRequiredService<Application>();
-        var mainWindow = _services.GetRequiredService<Window>();
+        var mainWindow = _services.GetRequiredService<BlazorDesktopWindow>();
 
         app.Startup += OnApplicationStartup;
         app.Exit += OnApplicationExit;
+        app.DispatcherUnhandledException += OnApplicationException;
 
         app.MainWindow = mainWindow;
 
         app.Run();
+
+        app.DispatcherUnhandledException -= OnApplicationException;
+        app.Exit -= OnApplicationExit;
+        app.Startup -= OnApplicationStartup;
     }
 
-    /// <summary>
-    /// Occurs when the application is starting up.
-    /// </summary>
-    /// <param name="sender">The sending object.</param>
-    /// <param name="e">The arguments.</param>
     private void OnApplicationStartup(object sender, StartupEventArgs e)
     {
         var app = _services.GetRequiredService<Application>();
@@ -110,27 +93,30 @@ public class BlazorDesktopService : IHostedService, IDisposable
         app.MainWindow.Show();
     }
 
-    /// <summary>
-    /// Occurs when the application exits.
-    /// </summary>
-    /// <param name="sender">The sending object.</param>
-    /// <param name="e">The arguments.</param>
     private void OnApplicationExit(object? sender, ExitEventArgs e)
     {
         _lifetime.StopApplication();
     }
 
-    /// <summary>
-    /// Occurs when the application is stopping.
-    /// </summary>
+    private void OnApplicationException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        if (e.Exception is TargetInvocationException && e.Exception.InnerException is not null)
+        {
+            LogUnhandledExceptionRenderingComponent(_logger, e.Exception.InnerException.Message, e.Exception.InnerException);
+        }
+        else
+        {
+            LogUnhandledExceptionRenderingComponent(_logger, e.Exception.Message, e.Exception);
+        }
+
+        e.Handled = true;
+    }
+
     private void OnApplicationStopping()
     {
         var app = _services.GetRequiredService<Application>();
 
-        app.Dispatcher.Invoke(() =>
-        {
-            app.Shutdown();
-        });
+        app.Dispatcher.Invoke(app.Shutdown);
     }
 
     /// <summary>

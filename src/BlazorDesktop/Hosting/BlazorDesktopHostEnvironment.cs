@@ -1,5 +1,5 @@
-﻿// Licensed to the Blazor Desktop Contributors under one or more agreements.
-// The Blazor Desktop Contributors licenses this file to you under the MIT license.
+﻿// Licensed to the .NET Extension Contributors under one or more agreements.
+// The .NET Extension Contributors licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System.IO;
@@ -10,7 +10,7 @@ namespace BlazorDesktop.Hosting;
 /// <summary>
 /// The blazor desktop host environment.
 /// </summary>
-internal class BlazorDesktopHostEnvironment : IWebHostEnvironment
+internal sealed class BlazorDesktopHostEnvironment : IWebHostEnvironment
 {
     /// <summary>
     /// The environment name.
@@ -58,9 +58,6 @@ internal class BlazorDesktopHostEnvironment : IWebHostEnvironment
     /// </summary>
     public IFileProvider WebRootFileProvider { get; set; }
 
-    /// <summary>
-    /// The host environment.
-    /// </summary>
     private readonly IHostEnvironment _hostEnvironment;
 
     /// <summary>

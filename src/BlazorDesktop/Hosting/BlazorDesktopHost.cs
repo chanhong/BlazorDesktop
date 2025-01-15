@@ -1,5 +1,5 @@
-﻿// Licensed to the Blazor Desktop Contributors under one or more agreements.
-// The Blazor Desktop Contributors licenses this file to you under the MIT license.
+﻿// Licensed to the .NET Extension Contributors under one or more agreements.
+// The .NET Extension Contributors licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 namespace BlazorDesktop.Hosting;
@@ -20,15 +20,8 @@ public sealed class BlazorDesktopHost : IHost, IAsyncDisposable
     /// </summary>
     public IServiceProvider Services => _host.Services;
 
-    /// <summary>
-    /// The host.
-    /// </summary>
     private readonly IHost _host;
 
-    /// <summary>
-    /// Creates an instance of <see cref="BlazorDesktopHost"/> with a specified <see cref="IHost"/>.
-    /// </summary>
-    /// <param name="host">The <see cref="IHost"/> instance.</param>
     internal BlazorDesktopHost(IHost host)
     {
         _host = host;

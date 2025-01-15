@@ -1,5 +1,5 @@
-﻿// Licensed to the Blazor Desktop Contributors under one or more agreements.
-// The Blazor Desktop Contributors licenses this file to you under the MIT license.
+﻿// Licensed to the .NET Extension Contributors under one or more agreements.
+// The .NET Extension Contributors licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System.Windows;
@@ -44,15 +44,8 @@ public sealed class BlazorDesktopHostBuilder
     /// </summary>
     public ConfigureWindowBuilder Window { get; }
 
-    /// <summary>
-    /// The host application builder.
-    /// </summary>
     private readonly HostApplicationBuilder _hostApplicationBuilder;
 
-    /// <summary>
-    /// Creates an instance of <see cref="BlazorDesktopHostBuilder"/> with the minimal configuration.
-    /// </summary>
-    /// <param name="args">The arguments passed to the application's main method.</param>
     private BlazorDesktopHostBuilder(string[]? args)
     {
         _hostApplicationBuilder = InitializeHostApplicationBuilder(args);
@@ -97,10 +90,7 @@ public sealed class BlazorDesktopHostBuilder
     /// </remarks>
     public void ConfigureContainer<TBuilder>(IServiceProviderFactory<TBuilder> factory, Action<TBuilder>? configure = null) where TBuilder : notnull
     {
-        if (factory == null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
+        ArgumentNullException.ThrowIfNull(factory);
 
         _hostApplicationBuilder.ConfigureContainer(factory, configure);
     }
@@ -114,11 +104,6 @@ public sealed class BlazorDesktopHostBuilder
         return new(_hostApplicationBuilder.Build());
     }
 
-    /// <summary>
-    /// Initializes the host application builder.
-    /// </summary>
-    /// <param name="args">The arguments passed to the application's main method.</param>
-    /// <returns>A <see cref="HostApplicationBuilder"/>.</returns>
     private static HostApplicationBuilder InitializeHostApplicationBuilder(string[]? args)
     {
         var configuration = new ConfigurationManager();
@@ -132,22 +117,16 @@ public sealed class BlazorDesktopHostBuilder
         });
     }
 
-    /// <summary>
-    /// Initializes the default services.
-    /// </summary>
     private void InitializeDefaultServices()
     {
+        Services.AddHttpClient();
         Services.AddWpfBlazorWebView();
         Services.AddSingleton<WebViewInstaller>();
         Services.AddSingleton<Application>();
-        Services.AddSingleton<Window, BlazorDesktopWindow>();
+        Services.AddSingleton<BlazorDesktopWindow>();
         Services.AddHostedService<BlazorDesktopService>();
     }
 
-    /// <summary>
-    /// Initializes the root components.
-    /// </summary>
-    /// <returns>A <see cref="RootComponentMappingCollection"/>.</returns>
     private RootComponentMappingCollection InitializeRootComponents()
     {
         var rootComponents = new RootComponentMappingCollection();
@@ -157,10 +136,6 @@ public sealed class BlazorDesktopHostBuilder
         return rootComponents;
     }
 
-    /// <summary>
-    /// Initializes the environment.
-    /// </summary>
-    /// <returns>A <see cref="BlazorDesktopHostEnvironment"/>.</returns>
     private BlazorDesktopHostEnvironment InitializeEnvironment()
     {
         var hostEnvironment = new BlazorDesktopHostEnvironment(_hostApplicationBuilder.Environment, Configuration);
@@ -170,10 +145,6 @@ public sealed class BlazorDesktopHostBuilder
         return hostEnvironment;
     }
 
-    /// <summary>
-    /// Initializes the window builder.
-    /// </summary>
-    /// <returns>A <see cref="ConfigureWindowBuilder"/>.</returns>
     private ConfigureWindowBuilder InitializeWindowBuilder()
     {
         return new ConfigureWindowBuilder(Configuration);

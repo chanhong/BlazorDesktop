@@ -1,11 +1,12 @@
-﻿// Licensed to the Blazor Desktop Contributors under one or more agreements.
-// The Blazor Desktop Contributors licenses this file to you under the MIT license.
+﻿// Licensed to the .NET Extension Contributors under one or more agreements.
+// The .NET Extension Contributors licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -20,7 +21,7 @@ namespace BlazorDesktop.Wpf;
 /// <summary>
 /// The blazor desktop window.
 /// </summary>
-public class BlazorDesktopWindow : Window
+public partial class BlazorDesktopWindow : Window
 {
     /// <summary>
     /// The <see cref="BlazorWebView"/>.
@@ -33,28 +34,22 @@ public class BlazorDesktopWindow : Window
     public Border WebViewBorder { get; }
 
     /// <summary>
-    /// The service provider.
+    /// If the window is fullscreen.
     /// </summary>
+    public bool IsFullscreen { get; private set; }
+
+    /// <summary>
+    /// Occurs when <see cref="IsFullscreen"/> changes.
+    /// </summary>
+    public event EventHandler<bool>? OnFullscreenChanged;
+
+    private WindowState _fullscreenStoredState = WindowState.Normal;
     private readonly IServiceProvider _services;
-
-    /// <summary>
-    /// The configuration.
-    /// </summary>
     private readonly IConfiguration _config;
-
-    /// <summary>
-    /// The hosting environment.
-    /// </summary>
     private readonly IWebHostEnvironment _environment;
-
-    /// <summary>
-    /// The UI settings.
-    /// </summary>
     private readonly UISettings _uiSettings;
-
-    /// <summary>
-    /// The drag script.
-    /// </summary>
+    private readonly double[] _zoomSizes =
+        [5, 4, 3, 2.5, 2, 1.75, 1.5, 1.25, 1.1, 1, 0.9, 0.8, 0.75, 0.66, 0.5, 0.33, 0.25];
     private const string DragScript =
 @"
 window.addEventListener('DOMContentLoaded', () => {
@@ -93,38 +88,173 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     /// <summary>
-    /// Initializes the window.
+    /// Toggles fullscreen mode.
     /// </summary>
+    public void ToggleFullScreen()
+    {
+        if (WindowStyle == WindowStyle.SingleBorderWindow)
+        {
+            IsFullscreen = true;
+            _fullscreenStoredState = WindowState;
+
+            UseFrame(_config.GetValue<bool?>(WindowDefaults.Frame) ?? true);
+            WindowStyle = WindowStyle.None;
+
+            if (WindowState == WindowState.Maximized)
+            {
+                WindowState = WindowState.Normal;
+            }
+
+            WindowState = WindowState.Maximized;
+
+            OnFullscreenChanged?.Invoke(this, IsFullscreen);
+        }
+        else
+        {
+            IsFullscreen = false;
+
+            UseFrame(_config.GetValue<bool?>(WindowDefaults.Frame) ?? true);
+            WindowStyle = WindowStyle.SingleBorderWindow;
+            WindowState = _fullscreenStoredState;
+
+            OnFullscreenChanged?.Invoke(this, IsFullscreen);
+        }
+    }
+
+    /// <summary>
+    /// Resets the zoom level.
+    /// </summary>
+    public void ResetZoom()
+    {
+        WebView.WebView.ZoomFactor = 1;
+    }
+
+    /// <summary>
+    /// Zooms in.
+    /// </summary>
+    public void ZoomIn()
+    {
+        var closest = _zoomSizes.Select(z => new { Zoom = z, Distance = Math.Abs(z - WebView.WebView.ZoomFactor) })
+            .OrderBy(p => p.Distance)
+            .Select(p => p.Zoom)
+            .First();
+
+        var closestIndex = Array.IndexOf(_zoomSizes, closest);
+
+        if (closestIndex > 0)
+        {
+            var newZoomSize = _zoomSizes[closestIndex - 1];
+
+            WebView.WebView.ZoomFactor = newZoomSize;
+        }
+    }
+
+    /// <summary>
+    /// Zooms in.
+    /// </summary>
+    public void ZoomOut()
+    {
+        var closest = _zoomSizes.Select(z => new { Zoom = z, Distance = Math.Abs(z - WebView.WebView.ZoomFactor) })
+            .OrderBy(p => p.Distance)
+            .Select(p => p.Zoom)
+            .First();
+
+        var closestIndex = Array.IndexOf(_zoomSizes, closest);
+
+        if (closestIndex < _zoomSizes.Length - 1)
+        {
+            var newZoomSize = _zoomSizes[closestIndex + 1];
+
+            WebView.WebView.ZoomFactor = newZoomSize;
+        }
+    }
+
     private void InitializeWindow()
     {
+        var height = _config.GetValue<int?>(WindowDefaults.Height) ?? 768;
+        var width = _config.GetValue<int?>(WindowDefaults.Width) ?? 1366;
+        var minHeight = _config.GetValue<int?>(WindowDefaults.MinHeight) ?? 0;
+        var minWidth = _config.GetValue<int?>(WindowDefaults.MinWidth) ?? 0;
+        var maxHeight = _config.GetValue<int?>(WindowDefaults.MaxHeight) ?? double.PositiveInfinity;
+        var maxWidth = _config.GetValue<int?>(WindowDefaults.MaxWidth) ?? double.PositiveInfinity;
+
+        var useFrame = _config.GetValue<bool?>(WindowDefaults.Frame) ?? true;
+
+        if (useFrame)
+        {
+            height += 7;
+            width += 14;
+
+            if (minHeight != 0)
+            {
+                minHeight += 7;
+            }
+
+            if (minWidth != 0)
+            {
+                minWidth += 14;
+            }
+
+            if (maxHeight != double.PositiveInfinity)
+            {
+                maxHeight += 7;
+            }
+
+            if (maxWidth != double.PositiveInfinity)
+            {
+                maxWidth += 14;
+            }
+        }
+        else
+        {
+            height += 3;
+            width += 6;
+
+            if (minHeight != 0)
+            {
+                minHeight += 3;
+            }
+
+            if (minWidth != 0)
+            {
+                minWidth += 6;
+            }
+
+            if (maxHeight != double.PositiveInfinity)
+            {
+                maxHeight += 3;
+            }
+
+            if (maxWidth != double.PositiveInfinity)
+            {
+                maxWidth += 6;
+            }
+        }
+
         Name = "BlazorDesktopWindow";
         Title = _config.GetValue<string?>(WindowDefaults.Title) ?? _environment.ApplicationName;
-        Height = _config.GetValue<int?>(WindowDefaults.Height) ?? 768;
-        Width = _config.GetValue<int?>(WindowDefaults.Width) ?? 1366;
-        MinHeight = _config.GetValue<int?>(WindowDefaults.MinHeight) ?? 0;
-        MinWidth = _config.GetValue<int?>(WindowDefaults.MinWidth) ?? 0;
-        MaxHeight = _config.GetValue<int?>(WindowDefaults.MaxHeight) ?? double.PositiveInfinity;
-        MaxWidth = _config.GetValue<int?>(WindowDefaults.MaxWidth) ?? double.PositiveInfinity;
-        UseFrame(_config.GetValue<bool?>(WindowDefaults.Frame) ?? true);
+        Height = height;
+        Width = width;
+        MinHeight = minHeight;
+        MinWidth = minWidth;
+        MaxHeight = maxHeight;
+        MaxWidth = maxWidth;
+        UseFrame(useFrame);
         ResizeMode = (_config.GetValue<bool?>(WindowDefaults.Resizable) ?? true) ? ResizeMode.CanResize : ResizeMode.NoResize;
         UseIcon(_config.GetValue<string?>(WindowDefaults.Icon) ?? string.Empty);
         Content = WebViewBorder;
         StateChanged += WindowStateChanged;
+        KeyDown += WindowKeyDown;
     }
 
-    /// <summary>
-    /// Initializes the web view border.
-    /// </summary>
     private void InitializeWebViewBorder()
     {
         WebViewBorder.Name = "BlazorDesktopWebViewBorder";
-        WebViewBorder.BorderThickness = new Thickness(0, 0, 0, 0);
         WebViewBorder.Child = WebView;
+
+        UpdateWebViewBorderThickness();
     }
 
-    /// <summary>
-    /// Initializes the web view.
-    /// </summary>
     private void InitializeWebView()
     {
         WebView.Name = "BlazorDesktopWebView";
@@ -144,27 +274,55 @@ window.addEventListener('DOMContentLoaded', () => {
         WebView.Loaded += WebViewLoaded;
     }
 
-    /// <summary>
-    /// Initializes theming.
-    /// </summary>
     private void InitializeTheming()
     {
         SourceInitialized += WindowSourceInitialized;
         _uiSettings.ColorValuesChanged += ThemeChanged;
     }
 
-    /// <summary>
-    /// Occurs when the window state changes.
-    /// </summary>
-    /// <param name="sender">The sending object.</param>
-    /// <param name="e">The arguments.</param>
     private void WindowStateChanged(object? sender, EventArgs e)
+    {
+        UpdateWebViewBorderThickness();
+    }
+
+    private void WindowKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F11)
+        {
+            ToggleFullScreen();
+        }
+    }
+
+    private void WindowSourceInitialized(object? sender, EventArgs e)
+    {
+        UpdateTheme();
+    }
+
+    private void ThemeChanged(UISettings sender, object args)
+    {
+        Dispatcher.Invoke(new(UpdateTheme));
+    }
+
+    private void UpdateWebViewBorderThickness()
     {
         var useFrame = _config.GetValue<bool?>(WindowDefaults.Frame) ?? true;
 
+        WebViewBorder.BorderThickness = new Thickness(20, 20, 20, 20);
+
         if (WindowState == WindowState.Maximized && !useFrame)
         {
-            WebViewBorder.BorderThickness = new Thickness(8, 8, 8, 0);
+            if (IsFullscreen)
+            {
+                WebViewBorder.BorderThickness = new Thickness(7, 7, 7, 7);
+            }
+            else
+            {
+                WebViewBorder.BorderThickness = new Thickness(8, 8, 8, 8);
+            }
+        }
+        else if (WindowState != WindowState.Maximized && !useFrame)
+        {
+            WebViewBorder.BorderThickness = new Thickness(3, 0, 3, 3);
         }
         else
         {
@@ -172,59 +330,35 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /// <summary>
-    /// Occurs when the window source has initialized.
-    /// </summary>
-    /// <param name="sender">The sending object.</param>
-    /// <param name="e">The arguments.</param>
-    private void WindowSourceInitialized(object? sender, EventArgs e)
-    {
-        UpdateTheme();
-    }
-
-    /// <summary>
-    /// Occurs when the theme changes.
-    /// </summary>
-    /// <param name="sender">The sending object.</param>
-    /// <param name="args">The arguments.</param>
-    private void ThemeChanged(UISettings sender, object args)
-    {
-        Dispatcher.Invoke(new(UpdateTheme));
-    }
-
-    /// <summary>
-    /// Update the current theme to match the system.
-    /// </summary>
     private void UpdateTheme()
     {
         if (ShouldSystemUseDarkMode())
         {
-            _ = DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 20, new int[] { 1 }, Marshal.SizeOf(typeof(int)));
+            _ = DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 20, [1], Marshal.SizeOf<int>());
             Background = new SolidColorBrush(Color.FromRgb(25, 25, 25));
         }
         else
         {
-            _ = DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 20, new int[] { 0 }, Marshal.SizeOf(typeof(int)));
+            _ = DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 20, [0], Marshal.SizeOf<int>());
             Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
         }
     }
 
-    /// <summary>
-    /// If a frame should be used.
-    /// </summary>
-    /// <param name="frame">If the frame should be used.</param>
     private void UseFrame(bool frame)
     {
         if (!frame)
         {
-            WindowChrome.SetWindowChrome(this, new() { NonClientFrameEdges = NonClientFrameEdges.Bottom | NonClientFrameEdges.Left | NonClientFrameEdges.Right });
+            if (IsFullscreen)
+            {
+                WindowChrome.SetWindowChrome(this, new() { NonClientFrameEdges = NonClientFrameEdges.None });
+            }
+            else
+            {
+                WindowChrome.SetWindowChrome(this, new() { NonClientFrameEdges = NonClientFrameEdges.Bottom | NonClientFrameEdges.Left | NonClientFrameEdges.Right });
+            }
         }
     }
 
-    /// <summary>
-    /// Uses an icon.
-    /// </summary>
-    /// <param name="icon">The icon string</param>
     private void UseIcon(string icon)
     {
         var defaultIconPath = Path.Combine(_environment.WebRootPath, "favicon.ico");
@@ -243,21 +377,11 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /// <summary>
-    /// Occurs when the web view has loaded.
-    /// </summary>
-    /// <param name="sender">The sending object.</param>
-    /// <param name="e">The arguments.</param>
     private void WebViewLoaded(object sender, RoutedEventArgs e)
     {
         WebView.WebView.CoreWebView2InitializationCompleted += WebViewInitializationCompleted;
     }
 
-    /// <summary>
-    /// Occurs when the web view has finished initialization.
-    /// </summary>
-    /// <param name="sender">The sending object.</param>
-    /// <param name="e">The arguments.</param>
     private void WebViewInitializationCompleted(object? sender, CoreWebView2InitializationCompletedEventArgs e)
     {
         var eventForwarder = new BlazorDesktopEventForwarder(new WindowInteropHelper(this).Handle);
@@ -269,11 +393,6 @@ window.addEventListener('DOMContentLoaded', () => {
         WebView.WebView.DefaultBackgroundColor = System.Drawing.Color.Transparent;
     }
 
-    /// <summary>
-    /// Occurs when the web view has finished navigating.
-    /// </summary>
-    /// <param name="sender">The sending object.</param>
-    /// <param name="e">The arguments.</param>
     private void BlazorWebViewNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
     {
         WindowState = WindowState.Normal;
@@ -281,21 +400,10 @@ window.addEventListener('DOMContentLoaded', () => {
         WebView.WebView.CoreWebView2.NavigationCompleted -= BlazorWebViewNavigationCompleted;
     }
 
-    /// <summary>
-    /// Determines if apps should use dark mode.
-    /// </summary>
-    /// <returns>True if they should, otherwise false.</returns>
-    [DllImport("UXTheme.dll", SetLastError = true, EntryPoint = "#138")]
-    private static extern bool ShouldSystemUseDarkMode();
+    [LibraryImport("UXTheme.dll", EntryPoint = "#138", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool ShouldSystemUseDarkMode();
 
-    /// <summary>
-    /// Sets the value of Desktop Window Manager (DWM) non-client rendering attributes for a window.
-    /// </summary>
-    /// <param name="hwnd">The handle to the window for which the attribute value is to be set.</param>
-    /// <param name="dwAttribute">A flag describing which value to set, specified as a value of the DWMWINDOWATTRIBUTE enumeration.</param>
-    /// <param name="pvAttribute">A pointer to an object containing the attribute value to set.</param>
-    /// <param name="cbAttribute">The size, in bytes, of the attribute value being set via the pvAttribute parameter.</param>
-    /// <returns>If the function succeeds, it returns S_OK. Otherwise, it returns an HRESULT error code.</returns>
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, int[] pvAttribute, int cbAttribute);
+    [LibraryImport("dwmapi.dll")]
+    private static partial int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, [In] int[] pvAttribute, int cbAttribute);
 }

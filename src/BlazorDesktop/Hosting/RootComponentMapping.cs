@@ -1,5 +1,5 @@
-﻿// Licensed to the Blazor Desktop Contributors under one or more agreements.
-// The Blazor Desktop Contributors licenses this file to you under the MIT license.
+﻿// Licensed to the .NET Extension Contributors under one or more agreements.
+// The .NET Extension Contributors licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using Microsoft.AspNetCore.Components;
@@ -36,20 +36,14 @@ public readonly struct RootComponentMapping
     /// <exception cref="ArgumentException">Occurs when <paramref name="componentType"/> does not inherit from <see cref="IComponent"/>.</exception>
     public RootComponentMapping(Type componentType, string selector)
     {
-        if (componentType is null)
-        {
-            throw new ArgumentNullException(nameof(componentType));
-        }
+        ArgumentNullException.ThrowIfNull(componentType);
 
         if (!typeof(IComponent).IsAssignableFrom(componentType))
         {
             throw new ArgumentException($"The type '{componentType.Name}' must implement {nameof(IComponent)} to be used as a root component.", nameof(componentType));
         }
 
-        if (selector is null)
-        {
-            throw new ArgumentNullException(nameof(selector));
-        }
+        ArgumentNullException.ThrowIfNull(selector);
 
         ComponentType = componentType;
         Selector = selector;
